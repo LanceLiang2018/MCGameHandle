@@ -47,7 +47,7 @@ class BaseComm:
         if line == '':
             print('测试失败！')
             return False
-        if len(line) == 11:
+        if len(line) == 5:
             return self.test()
         return True
 
