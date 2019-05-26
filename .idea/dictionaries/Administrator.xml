@@ -2,6 +2,8 @@
   <dictionary name="Administrator">
     <words>
       <w>readline</w>
+      <w>softmax</w>
+      <w>tanh</w>
     </words>
   </dictionary>
 </component>
