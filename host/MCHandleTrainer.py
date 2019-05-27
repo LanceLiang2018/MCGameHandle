@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import messagebox
 from keras.layers import Dense
 from keras.models import Sequential, load_model
+import tensorflow as tf
 import serial
 import serial.tools.list_ports
 import threading
@@ -27,14 +28,14 @@ class MCHandleTrainer:
         self.init_bps = StringVar()
         self.init_bps.set('115200')
         self.init_com_left = StringVar()
-        self.init_com_left.set('COM4')
+        self.init_com_left.set('COM5')
         self.init_com_right = StringVar()
-        self.init_com_right.set('COM4')
+        self.init_com_right.set('COM5')
 
         self.init_communication()
 
-        self.port_left = 'COM4'
-        self.port_right = 'COM4'
+        self.port_left = 'COM5'
+        self.port_right = 'COM5'
         self.bps = 115200
         self.comm = None
         self.n = 512
@@ -49,9 +50,11 @@ class MCHandleTrainer:
         except OSError:
             model = Sequential()
             # 先做一只手的测试。6个数据*select。
-            model.add(Dense(self.select * 6, activation='tanh', input_dim=self.select * 6))
-            model.add(Dense(self.select * 3, activation='tanh'))
-            model.add(Dense(self.select, activation='tanh'))
+            # model.add(Dense(self.select * 6, activation='tanh', input_dim=self.select * 6))
+            model.add(Dense(384, activation='tanh', input_dim=384))
+            model.add(Dense(128, activation='tanh'))
+            # model.add(Dense(self.select * 3, activation='tanh'))
+            # model.add(Dense(self.select, activation='tanh'))
             model.add(Dense(6, activation='softmax'))
 
             model.compile(loss='binary_crossentropy', optimizer='adam')
@@ -196,8 +199,8 @@ class MCHandleTrainer:
                 tx = np.zeros((1, 384))
                 ty = np.zeros((1, 6))
                 print(tx.shape, ty.shape)
-                # res = self.model.train_on_batch(x=tx, y=ty)
-                res = self.model.fit(x=tx, y=ty, batch_size=32, epochs=32)
+                res = self.model.train_on_batch(x=tx, y=ty)
+                # res = self.model.fit(x=tx, y=ty, batch_size=32, epochs=32)
                 print('train:', res)
             self.t2 += 1
 
