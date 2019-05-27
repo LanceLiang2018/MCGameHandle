@@ -45,22 +45,10 @@ class MCHandleTrainer:
         # 建立网络
         self.model_file = 'mc_actions.h5'
 
-        try:
-            model = load_model(self.model_file)
-        except OSError:
-            model = Sequential()
-            # 先做一只手的测试。6个数据*select。
-            # model.add(Dense(self.select * 6, activation='tanh', input_dim=self.select * 6))
-            model.add(Dense(384, activation='tanh', input_dim=384))
-            model.add(Dense(128, activation='tanh'))
-            # model.add(Dense(self.select * 3, activation='tanh'))
-            # model.add(Dense(self.select, activation='tanh'))
-            model.add(Dense(6, activation='softmax'))
+        # 建立网络的过程放在线程2
 
-            model.compile(loss='binary_crossentropy', optimizer='adam')
-
-        self.model = model
-        print(self.model.get_config())
+        # self.model = model
+        # print(self.model.get_config())
 
         self.comm_left = BaseComm(self.init_com_left.get(), self.bps)
         # self.comm_right = BaseComm(self.init_com_right.get(), self.bps)
@@ -102,6 +90,27 @@ class MCHandleTrainer:
         t = threading.Thread(target=self.read_thread)
         t.setDaemon(True)
         t.start()
+
+    def predict_mode(self):
+        pass
+
+    def action_forward(self):
+        pass
+
+    def action_jump(self):
+        pass
+
+    def action_down(self):
+        pass
+
+    def action_hit(self):
+        pass
+
+    def action_put(self):
+        pass
+
+    def action_none(self):
+        pass
 
     def init_communication(self):
         top = self.init_top
@@ -163,6 +172,21 @@ class MCHandleTrainer:
         pass
 
     def read_thread(self):
+        # 建模
+        try:
+            model = load_model(self.model_file)
+        except OSError:
+            model = Sequential()
+            # 先做一只手的测试。6个数据*select。
+            # model.add(Dense(self.select * 6, activation='tanh', input_dim=self.select * 6))
+            model.add(Dense(384, activation='tanh', input_dim=384))
+            model.add(Dense(128, activation='tanh'))
+            # model.add(Dense(self.select * 3, activation='tanh'))
+            # model.add(Dense(self.select, activation='tanh'))
+            model.add(Dense(6, activation='softmax'))
+
+            model.compile(loss='binary_crossentropy', optimizer='adam')
+
         while True:
             self.var_training.set(self.training)
 
@@ -183,25 +207,18 @@ class MCHandleTrainer:
 
             # 开始训练
             if self.t2 == 5:
-                y = np.array(self.frames[len(self.frames) - self.select:])
-                y = y.reshape((1, y.size))
-                print('Y shape:', y.shape)
+                x = np.array(self.frames[len(self.frames) - self.select:])
+                x = x.reshape((1, x.size))
+                # print('X shape:', x.shape)
                 one = [0 for i in range(6)]
                 one[self.ACTIONS.index(self.training)] = 1
-                # one = [self.ACTIONS.index(self.training), ]
-                # x = np.array([one for i in range(6)])
-                x = np.array(one)
-                # x = x.reshape((1, x.size))
-                x = x.reshape((1, 6))
-                print('X shape:', x.shape)
+                y = np.array(one)
+                y = y.reshape((1, 6))
+                # print('Y shape:', y.shape)
                 self.t2 = 0
-                # res = self.model.train_on_batch(x=x, y=y)
-                tx = np.zeros((1, 384))
-                ty = np.zeros((1, 6))
-                print(tx.shape, ty.shape)
-                res = self.model.train_on_batch(x=tx, y=ty)
+                res = model.train_on_batch(x=x, y=y)
                 # res = self.model.fit(x=tx, y=ty, batch_size=32, epochs=32)
-                print('train:', res)
+                # print('train:', res)
             self.t2 += 1
 
     def draw(self):
