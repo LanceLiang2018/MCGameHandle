@@ -81,6 +81,12 @@ void setup() {
   Serial.begin(115200);                       //开启串口，设置波特率
   delay(1000);
   mpu.initialize();                       //初始化MPU6050
+
+  //初始化摇杆
+  pinMode(A1, INPUT);
+  pinMode(A2, INPUT);
+  pinMode(A3, INPUT);
+  
   Serial.println("Init");
 }
  
@@ -97,7 +103,15 @@ void loop() {
   Serial.print(az);Serial.print(",");
   Serial.print(angle);Serial.print(",");
   Serial.print(angle_dot);Serial.print(",");
-  Serial.println(angle6);
+  Serial.print(angle6);Serial.print(",");
+
+  int val = 0;
+  val = analogRead(A1);
+  Serial.print(val);Serial.print(",");
+  val = analogRead(A2);
+  Serial.print(val);Serial.print(",");
+  val = analogRead(A3);
+  Serial.println(val);
   
   delay(5);
 }

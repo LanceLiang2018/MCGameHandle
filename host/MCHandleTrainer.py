@@ -28,14 +28,14 @@ class MCHandleTrainer:
         self.init_bps = StringVar()
         self.init_bps.set('115200')
         self.init_com_left = StringVar()
-        self.init_com_left.set('COM4')
+        self.init_com_left.set('COM5')
         self.init_com_right = StringVar()
-        self.init_com_right.set('COM5')
+        self.init_com_right.set('COM9')
 
         self.init_communication()
 
-        self.port_left = 'COM4'
-        self.port_right = 'COM5'
+        self.port_left = 'COM5'
+        self.port_right = 'COM9'
         self.bps = 115200
         self.comm = None
         self.n = 512
