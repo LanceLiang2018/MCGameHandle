@@ -28,19 +28,19 @@ class MCHandleTrainer:
         self.init_bps = StringVar()
         self.init_bps.set('115200')
         self.init_com_left = StringVar()
-        self.init_com_left.set('COM5')
+        self.init_com_left.set('COM4')
         self.init_com_right = StringVar()
         self.init_com_right.set('COM5')
 
         self.init_communication()
 
-        self.port_left = 'COM5'
+        self.port_left = 'COM4'
         self.port_right = 'COM5'
         self.bps = 115200
         self.comm = None
         self.n = 512
         self.select = 64
-        self.frames = [[0 for i in range(6)] for j in range(self.n)]
+        self.frames = [[0 for i in range(12)] for j in range(self.n)]
 
         # 建立网络
         self.model_file = 'mc_actions.h5'
@@ -51,7 +51,7 @@ class MCHandleTrainer:
         # print(self.model.get_config())
 
         self.comm_left = BaseComm(self.init_com_left.get(), self.bps)
-        # self.comm_right = BaseComm(self.init_com_right.get(), self.bps)
+        self.comm_right = BaseComm(self.init_com_right.get(), self.bps)
 
         self.root = root
         if self.root is None:
@@ -62,27 +62,30 @@ class MCHandleTrainer:
         self.panel.pack(side=TOP, expand=1, fill=X)
 
         frame = Frame(self.root)
-        Button(frame, text='预测模式').grid(row=1, column=1, sticky=W + E)
-        Button(frame, text='前进').grid(row=1, column=2, sticky=W + E)
-        Button(frame, text='上跳').grid(row=1, column=3, sticky=W + E)
-        Button(frame, text='下降').grid(row=1, column=4, sticky=W + E)
-        Button(frame, text='打击').grid(row=1, column=5, sticky=W + E)
-        Button(frame, text='放置').grid(row=1, column=6, sticky=W + E)
-        Button(frame, text='无动作').grid(row=1, column=7, sticky=W + E)
-        Label(frame, text='正在训练:').grid(row=1, column=8, sticky=W + E)
+        Button(frame, text='切换模式', command=self.predict_mode).grid(row=1, column=1, sticky=W + E)
+        Button(frame, text='前进', command=self.action_forward).grid(row=1, column=2, sticky=W + E)
+        Button(frame, text='上跳', command=self.action_jump).grid(row=1, column=3, sticky=W + E)
+        Button(frame, text='下降', command=self.action_down).grid(row=1, column=4, sticky=W + E)
+        Button(frame, text='打击', command=self.action_hit).grid(row=1, column=5, sticky=W + E)
+        Button(frame, text='放置', command=self.action_put).grid(row=1, column=6, sticky=W + E)
+        Button(frame, text='无动作', command=self.action_none).grid(row=1, column=7, sticky=W + E)
+        Button(frame, text='保存模型', command=self.save_model).grid(row=1, column=8, sticky=W + E)
+        Label(frame, text='正在训练:').grid(row=1, column=9, sticky=W + E)
 
         self.var_training = StringVar()
         self.var_training.set('...')
-        Label(frame, textvariable=self.var_training).grid(row=1, column=9, sticky=W + E)
+        Label(frame, textvariable=self.var_training).grid(row=1, column=10, sticky=W + E)
 
         frame.pack(side=BOTTOM, expand=1, fill=X)
 
-        self.logger_test = UiLogger(self.root, title='测试结果', simplify=True, height=10)
+        self.logger_test = UiLogger(self.root, title='程序日志', simplify=False, height=10)
         self.logger_test.logger().pack(side=BOTTOM, expand=1, fill=X)
 
         self.lock = threading.Lock()
 
         self.training = self.ACTION_NONE
+        self.will_save_model = False
+        self.train_mode = True
 
         self.t1 = 0
         self.t2 = 0
@@ -92,25 +95,48 @@ class MCHandleTrainer:
         t.start()
 
     def predict_mode(self):
-        pass
+        if self.train_mode is True:
+            self.train_mode = False
+            self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_WARNING, 'switch', '切换到预测模式'))
+        else:
+            self.train_mode = True
+            self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_WARNING, 'switch', '切换到训练模式'))
 
     def action_forward(self):
-        pass
+        if self.training == self.ACTION_FORWARD:
+            self.training = self.ACTION_NONE
+        else:
+            self.training = self.ACTION_FORWARD
 
     def action_jump(self):
-        pass
+        if self.training == self.ACTION_JUMP:
+            self.training = self.ACTION_NONE
+        else:
+            self.training = self.ACTION_JUMP
 
     def action_down(self):
-        pass
+        if self.training == self.ACTION_DOWN:
+            self.training = self.ACTION_NONE
+        else:
+            self.training = self.ACTION_DOWN
 
     def action_hit(self):
-        pass
+        if self.training == self.ACTION_HIT:
+            self.training = self.ACTION_NONE
+        else:
+            self.training = self.ACTION_HIT
 
     def action_put(self):
-        pass
+        if self.training == self.ACTION_PUT:
+            self.training = self.ACTION_NONE
+        else:
+            self.training = self.ACTION_PUT
 
     def action_none(self):
-        pass
+        self.training = self.ACTION_NONE
+
+    def save_model(self):
+        self.will_save_model = True
 
     def init_communication(self):
         top = self.init_top
@@ -160,7 +186,7 @@ class MCHandleTrainer:
             res = False
         comm.close()
         print('测试右手柄')
-        comm = BaseComm(self.init_com_left.get(), bps)
+        comm = BaseComm(self.init_com_right.get(), bps)
         if not comm.test():
             if show is True:
                 messagebox.showerror("错误", '测试右手柄失败')
@@ -177,12 +203,11 @@ class MCHandleTrainer:
             model = load_model(self.model_file)
         except OSError:
             model = Sequential()
-            # 先做一只手的测试。6个数据*select。
-            # model.add(Dense(self.select * 6, activation='tanh', input_dim=self.select * 6))
-            model.add(Dense(384, activation='tanh', input_dim=384))
-            model.add(Dense(128, activation='tanh'))
-            # model.add(Dense(self.select * 3, activation='tanh'))
-            # model.add(Dense(self.select, activation='tanh'))
+            model.add(Dense(self.select * 12, activation='tanh', input_dim=self.select * 12))
+            # model.add(Dense(384, activation='tanh', input_dim=384))
+            # model.add(Dense(128, activation='tanh'))
+            model.add(Dense(self.select * 3, activation='tanh'))
+            model.add(Dense(self.select, activation='tanh'))
             model.add(Dense(6, activation='softmax'))
 
             model.compile(loss='binary_crossentropy', optimizer='adam')
@@ -190,8 +215,11 @@ class MCHandleTrainer:
         while True:
             self.var_training.set(self.training)
 
-            data = self.comm_left.read1epoch()
+            data_left = self.comm_left.read1epoch()
+            data_right = self.comm_right.read1epoch()
             # print(data)
+            data = data_left
+            data.extend(data_right)
             self.lock.acquire()
             self.frames.append(data)
             if len(self.frames) > self.n:
@@ -206,7 +234,7 @@ class MCHandleTrainer:
             self.t1 += 1
 
             # 开始训练
-            if self.t2 == 5:
+            if self.t2 == 5 and self.train_mode is True:
                 x = np.array(self.frames[len(self.frames) - self.select:])
                 x = x.reshape((1, x.size))
                 # print('X shape:', x.shape)
@@ -217,22 +245,38 @@ class MCHandleTrainer:
                 # print('Y shape:', y.shape)
                 self.t2 = 0
                 res = model.train_on_batch(x=x, y=y)
-                # res = self.model.fit(x=tx, y=ty, batch_size=32, epochs=32)
                 # print('train:', res)
+                self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_INFO, 'training', '%s' % res))
+
             self.t2 += 1
+
+            if self.will_save_model is True:
+                print('保存模型...')
+                self.lock.acquire()
+                model.save(self.model_file)
+                self.will_save_model = False
+                self.lock.release()
+
+            # 预测模式
+            if self.t2 == 5 and self.train_mode is False:
+                x = np.array(self.frames[len(self.frames) - self.select:])
+                x = x.reshape((1, x.size))
+                y = model.predict(x=x)
+                self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_INFO, 'predict', '%s' % y))
 
     def draw(self):
         width = 1
         height = 32
         colors = [
-            'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple'
+            'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple',
+            'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple',
         ]
 
         size = (width * self.n, height * 6)
         im = Image.new("RGB", size, color='white')
         draw = ImageDraw.Draw(im)
         for i in range(self.n - 2):
-            for j in range(6):
+            for j in range(12):
                 draw.line((width * i, self.frames[i][j] + size[1] / 2,
                            width * (i + 1), self.frames[i + 1][j] + size[1] / 2), fill=colors[j])
         return im
