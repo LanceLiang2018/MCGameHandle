@@ -83,9 +83,11 @@ void setup() {
   mpu.initialize();                       //初始化MPU6050
 
   //初始化摇杆
-  pinMode(A1, INPUT);
+  pinMode(A1, INPUT_PULLUP);
   pinMode(A2, INPUT);
   pinMode(A3, INPUT);
+  //扩展按键
+  pinMode(A6, INPUT_PULLUP);
   
   Serial.println("Init");
 }
@@ -106,11 +108,13 @@ void loop() {
   Serial.print(angle6);Serial.print(",");
 
   int val = 0;
-  val = analogRead(A1);
+  val = digitalRead(A1);
   Serial.print(val);Serial.print(",");
   val = analogRead(A2);
   Serial.print(val);Serial.print(",");
   val = analogRead(A3);
+  Serial.print(val);Serial.print(",");
+  val = digitalRead(A6);
   Serial.println(val);
   
   delay(5);
