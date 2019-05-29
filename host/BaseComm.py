@@ -2,7 +2,7 @@ import serial
 
 
 class BaseComm:
-    def __init__(self, port: str, bps: int, timeout=0.5):
+    def __init__(self, port: str, bps: int, timeout=5):
         self.serial = serial.Serial(port, bps, timeout=timeout)
         self.default_code = 'M'.encode()
 

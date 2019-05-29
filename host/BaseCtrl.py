@@ -13,10 +13,15 @@ import time
 
 dll = WinDLL("C:\\Windows\\System32\\user32.dll")
 
-display = (1440, 900)
-
 # x,y = pag.position() # 返回鼠标的坐标
 # MC鼠标控制方法：迅速归中
+
+# 初始化屏幕大小
+dll.mouse_event(0x0001 | 0x8000, 65536, 65536, 0, 0)
+time.sleep(0.01)
+display = pag.position()
+display = list(map(lambda x: x+1, display))
+print('屏幕大小', display)
 
 
 class BaseCtrl:
@@ -58,10 +63,12 @@ class BaseCtrl:
     def move(x: int, y: int):
         # 使用相对位置
         # 范围：[1, 1, 屏幕宽度-1, 屏幕高度-1]
-        x = int(x * 65535 / display[0])
-        y = int(y * 65535 / display[1])
-        dll.mouse_event(BaseCtrl.MOUSEEVENTF_ABSOLUTE | BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
-        # dll.mouse_event(BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
+        # x = int(x * 65535 / display[0])
+        # y = int(y * 65535 / display[1])
+        x = int(x * 50 / display[0])
+        y = int(y * 50 / display[1])
+        # dll.mouse_event(BaseCtrl.MOUSEEVENTF_ABSOLUTE | BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
+        dll.mouse_event(BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
 
     @staticmethod
     def left_down():
