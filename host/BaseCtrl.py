@@ -17,11 +17,13 @@ dll = WinDLL("C:\\Windows\\System32\\user32.dll")
 # MC鼠标控制方法：迅速归中
 
 # 初始化屏幕大小
+_x , _y = pag.position()
 dll.mouse_event(0x0001 | 0x8000, 65536, 65536, 0, 0)
 time.sleep(0.01)
 display = pag.position()
 display = list(map(lambda x: x+1, display))
 print('屏幕大小', display)
+pag.position(_x, _y)
 
 
 class BaseCtrl:
