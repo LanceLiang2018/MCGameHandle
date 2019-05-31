@@ -23,8 +23,11 @@ time.sleep(0.01)
 display = pag.position()
 display = list(map(lambda x: x+1, display))
 print('屏幕大小', display)
-pag.position(_x, _y)
+# pag.position(_x, _y)
+dll.mouse_event(0x0001 | 0x8000, int(65536 * _x / display[0]), int(65536 * _y / display[0]), 0, 0)
 
+# 加上小数修正!
+fix = [0.0, 0.0]
 
 class BaseCtrl:
     MOUSEEVENTF_MOVE = 0x0001
@@ -52,6 +55,15 @@ class BaseCtrl:
     KEYEVENTF_EXTENDEDKEY = 0x0001
     # 按键单击
 
+    ACTION_NONE = 0
+    ACTION_W = 1
+    ACTION_S = 2
+    ACTION_A = 3
+    ACTION_D = 4
+    ACTION_E = 5
+    ACTION_UP = 6
+    ACTION_DOWN = 7
+
     def __init__(self):
         pass
 
@@ -62,15 +74,33 @@ class BaseCtrl:
             return
 
     @staticmethod
-    def move(x: int, y: int):
+    def move(x, y):
+        global fix
         # 使用相对位置
         # 范围：[1, 1, 屏幕宽度-1, 屏幕高度-1]
         # x = int(x * 65535 / display[0])
         # y = int(y * 65535 / display[1])
-        x = int(x * 50 / display[0])
-        y = int(y * 50 / display[1])
+        ix, iy = int(x), int(y)
+        fix[0] = fix[0] + (x - ix)
+        fix[1] = fix[1] + (y - iy)
+        if fix[0] >= 1:
+            fix[0] -= 1
+            ix += 1
+        if fix[0] <= -1:
+            fix[0] += 1
+            ix -= 1
+
+        if fix[1] >= 1:
+            fix[1] -= 1
+            iy += 1
+        if fix[1] <= -1:
+            fix[1] += 1
+            iy -= 1
+        ix = int(ix * 50 / display[0])
+        iy = int(iy * 50 / display[1])
+        print('fix:', fix)
         # dll.mouse_event(BaseCtrl.MOUSEEVENTF_ABSOLUTE | BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
-        dll.mouse_event(BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
+        dll.mouse_event(BaseCtrl.MOUSEEVENTF_MOVE, ix, iy, 0, 0)
 
     @staticmethod
     def left_down():
@@ -99,7 +129,7 @@ class BaseCtrl:
 
     @staticmethod
     def kbd_down(code: int):
-        dll.keybd_event(code, 0, 0, 0)
+        dll.keybd_event(int(code), 0, 0, 0)
 
     @staticmethod
     def kbd_up(code: int):
@@ -108,6 +138,9 @@ class BaseCtrl:
     @staticmethod
     def kbd_click(code: int):
         dll.keybd_event(code, 0, BaseCtrl.KEYEVENTF_EXTENDEDKEY, 0)
+        # dll.keybd_event(int(code), 0, 0, 0)
+        # time.sleep(0.01)
+        # dll.keybd_event(code, 0, BaseCtrl.KEYEVENTF_KEYUP, 0)
 
     @staticmethod
     def action_forward_down():
