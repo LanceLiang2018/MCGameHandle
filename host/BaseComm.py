@@ -25,6 +25,7 @@ class BaseComm:
     def read1epoch(self):
         line = self.readline()
         split = line.split(',')
+        # print(split)
         if len(split) != 10:
             return [0 for i in range(10)]
         try:

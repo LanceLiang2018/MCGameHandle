@@ -3,7 +3,7 @@ from host.BaseComm import BaseComm
 import time
 from host.codemap import VirtualKeyCode
 
-port = 'COM4'
+port = 'COM6'
 
 comm = BaseComm(port, 115200)
 click = False
@@ -12,22 +12,24 @@ dig = 0.3
 ctrl.when_hot_key(exit)
 # comm.test()
 
-# # 右手部分
-# while True:
-#     time.sleep(0.01)
-#     data = comm.read1epoch()[-4:]
-#     data = list(map(int, data))
-#     print(data)
-#     ctrl.move((data[1] - 504) * dig, (1024 - data[2] - 521) * dig)
-#
-#     if data[0] == 0 and click is False:
-#         ctrl.left_down()
-#         click = True
-#     if data[0] == 1 and click is True:
-#         ctrl.left_up()
-#         click = False
+# 右手部分
+while True:
+    time.sleep(0.01)
+    data = comm.read1epoch()[-4:]
+    # data = comm.read1epoch()
+    data = list(map(int, data))
+    print(data)
+    # ctrl.move((data[1] - 504) * dig, (1024 - data[2] - 521) * dig)
+    ctrl.move((data[2] - 521) * dig, (data[1] - 504) * dig)
 
+    if data[0] == 0 and click is False:
+        ctrl.left_down()
+        click = True
+    if data[0] == 1 and click is True:
+        ctrl.left_up()
+        click = False
 
+'''
 key1 = ctrl.ACTION_NONE
 key2 = ctrl.ACTION_NONE
 jump = ctrl.ACTION_NONE
@@ -82,3 +84,5 @@ while True:
 
 
     print(pos)
+
+'''
