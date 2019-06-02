@@ -3,7 +3,7 @@ import os
 import time
 import pyautogui as pag
 from ctypes import *
-# from win32api import GetSystemMetrics
+from win32api import GetSystemMetrics
 from host.codemap import VirtualKeyCode
 # https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyhook
 import pyHook
@@ -16,18 +16,22 @@ dll = WinDLL("C:\\Windows\\System32\\user32.dll")
 # x,y = pag.position() # 返回鼠标的坐标
 # MC鼠标控制方法：迅速归中
 
-# 初始化屏幕大小
-_x , _y = pag.position()
-dll.mouse_event(0x0001 | 0x8000, 65536, 65536, 0, 0)
-time.sleep(0.01)
-display = pag.position()
-display = list(map(lambda x: x+1, display))
-print('屏幕大小', display)
-# pag.position(_x, _y)
-dll.mouse_event(0x0001 | 0x8000, int(65536 * _x / display[0]), int(65536 * _y / display[0]), 0, 0)
+# # 初始化屏幕大小（鼠标方法。。）
+# _x , _y = pag.position()
+# dll.mouse_event(0x0001 | 0x8000, 65536, 65536, 0, 0)
+# time.sleep(0.01)
+# display = pag.position()
+# display = list(map(lambda x: x+1, display))
+# print('屏幕大小', display)
+# # pag.position(_x, _y)
+# dll.mouse_event(0x0001 | 0x8000, int(65536 * _x / display[0]), int(65536 * _y / display[0]), 0, 0)
 
-# 加上小数修正!
+display = [GetSystemMetrics(0), GetSystemMetrics(1)]
+print('屏幕大小', display)
+
+# 加上小数修正!(?)
 fix = [0.0, 0.0]
+
 
 class BaseCtrl:
     MOUSEEVENTF_MOVE = 0x0001
@@ -83,22 +87,31 @@ class BaseCtrl:
         ix, iy = int(x), int(y)
         fix[0] = fix[0] + (x - ix)
         fix[1] = fix[1] + (y - iy)
+        # 暂时去掉小数修正。。。有点问题
         if fix[0] >= 1:
             fix[0] -= 1
+            # print('FIX X+1')
             ix += 1
         if fix[0] <= -1:
             fix[0] += 1
             ix -= 1
+            # print('FIX X-1')
 
         if fix[1] >= 1:
             fix[1] -= 1
             iy += 1
+            # print('FIX Y+1')
         if fix[1] <= -1:
             fix[1] += 1
             iy -= 1
-        ix = int(ix * 50 / display[0])
-        iy = int(iy * 50 / display[1])
-        print('fix:', fix)
+            # print('FIX Y-1')
+        # 加上调整函数x^3
+        ix = ix**3
+        iy = iy**3
+        ix = int(ix * 65536 / 3500 / 3500 / display[0])
+        iy = int(iy * 65536 / 3500 / 3500 / display[1])
+        # print('move:', x, y , '->', ix, iy)
+        # print('fix:', fix)
         # dll.mouse_event(BaseCtrl.MOUSEEVENTF_ABSOLUTE | BaseCtrl.MOUSEEVENTF_MOVE, x, y, 0, 0)
         dll.mouse_event(BaseCtrl.MOUSEEVENTF_MOVE, ix, iy, 0, 0)
 
@@ -226,6 +239,7 @@ class BaseCtrl:
         t = threading.Thread(target=BaseCtrl.hot_key, args=(function, ))
         t.setDaemon(True)
         t.start()
+
 
 if __name__ == '__main__':
     # BaseCtrl.when_hot_key(lambda: print('HOT'))

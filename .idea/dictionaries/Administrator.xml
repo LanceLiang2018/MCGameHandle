@@ -5,6 +5,7 @@
       <w>readline</w>
       <w>softmax</w>
       <w>tanh</w>
+      <w>uilogger</w>
     </words>
   </dictionary>
 </component>

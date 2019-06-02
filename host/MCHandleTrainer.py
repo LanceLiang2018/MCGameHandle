@@ -215,11 +215,13 @@ class MCHandleTrainer:
         while True:
             self.var_training.set(self.training)
 
-            data_left = self.comm_left.read1epoch()
-            data_right = self.comm_right.read1epoch()
+            # 只需要MPU数据
+            data_left = self.comm_left.read1epoch()[:6]
+            data_right = self.comm_right.read1epoch()[:6]
             # print(data)
             data = data_left
             data.extend(data_right)
+            print(data)
             self.lock.acquire()
             self.frames.append(data)
             if len(self.frames) > self.n:
@@ -235,7 +237,9 @@ class MCHandleTrainer:
 
             # 开始训练
             if self.t2 == 5 and self.train_mode is True:
+                self.lock.acquire()
                 x = np.array(self.frames[len(self.frames) - self.select:])
+                self.lock.release()
                 x = x.reshape((1, x.size))
                 # print('X shape:', x.shape)
                 one = [0 for i in range(6)]

@@ -3,7 +3,7 @@ from host.BaseComm import BaseComm
 import time
 from host.codemap import VirtualKeyCode
 
-port = 'COM6'
+port = 'COM9'
 
 comm = BaseComm(port, 115200)
 click = False
