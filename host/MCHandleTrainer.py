@@ -8,6 +8,8 @@ import serial.tools.list_ports
 import threading
 from PIL import Image, ImageDraw, ImageTk
 import numpy as np
+import time
+import multiprocessing
 
 from host.BaseComm import BaseComm
 from host.ui_logger import UiLogger
@@ -28,19 +30,20 @@ class MCHandleTrainer:
         self.init_bps = StringVar()
         self.init_bps.set('115200')
         self.init_com_left = StringVar()
-        self.init_com_left.set('COM5')
+        self.init_com_left.set('COM8')
         self.init_com_right = StringVar()
         self.init_com_right.set('COM9')
 
         self.init_communication()
 
-        self.port_left = 'COM5'
+        self.port_left = 'COM8'
         self.port_right = 'COM9'
         self.bps = 115200
         self.comm = None
         self.n = 512
         self.select = 64
         self.frames = [[0 for i in range(12)] for j in range(self.n)]
+        self.raw = [[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] for j in range(self.n)]
 
         # 建立网络
         self.model_file = 'mc_actions.h5'
@@ -93,14 +96,19 @@ class MCHandleTrainer:
         t = threading.Thread(target=self.read_thread)
         t.setDaemon(True)
         t.start()
+        t = threading.Thread(target=self.parse_thread)
+        t.setDaemon(True)
+        t.start()
 
     def predict_mode(self):
         if self.train_mode is True:
             self.train_mode = False
             self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_WARNING, 'switch', '切换到预测模式'))
+            self.t2 = 0
         else:
             self.train_mode = True
             self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_WARNING, 'switch', '切换到训练模式'))
+            self.t2 = 0
 
     def action_forward(self):
         if self.training == self.ACTION_FORWARD:
@@ -197,11 +205,33 @@ class MCHandleTrainer:
     def init_communication_refresh(self):
         pass
 
+    # 第二个线程，负责读取
     def read_thread(self):
+        while True:
+            time.sleep(0.01)
+            data_left = self.comm_left.read1epoch()
+            data_right = self.comm_right.read1epoch()
+            self.lock.acquire()
+            self.raw.append([data_left, data_right])
+            if len(self.raw) > self.n:
+                self.raw = self.raw[1:-1]
+            self.lock.release()
+            # frames添加数据
+            ann = data_left[0:6]
+            ann.extend(data_right[0:6])
+            self.lock.acquire()
+            self.frames.append(ann)
+            if len(self.frames) > self.n:
+                self.frames = self.frames[1:-1]
+            self.lock.release()
+            # print('ANN DATA:', ann)
+
+    def parse_thread(self):
         # 建模
         try:
             model = load_model(self.model_file)
         except OSError:
+            print("Can't find", self.model_file)
             model = Sequential()
             model.add(Dense(self.select * 12, activation='tanh', input_dim=self.select * 12))
             # model.add(Dense(384, activation='tanh', input_dim=384))
@@ -212,21 +242,27 @@ class MCHandleTrainer:
 
             model.compile(loss='binary_crossentropy', optimizer='adam')
 
+        start = time.time()
+
         while True:
             self.var_training.set(self.training)
 
             # 只需要MPU数据
-            data_left = self.comm_left.read1epoch()[:6]
-            data_right = self.comm_right.read1epoch()[:6]
+            self.lock.acquire()
+            data_left = self.raw[-1][0][:6]
+            data_right = self.raw[-1][1][:6]
+            self.lock.release()
+            # data_left = self.comm_left.read1epoch()[:6]
+            # data_right = self.comm_right.read1epoch()[:6]
             # print(data)
             data = data_left
             data.extend(data_right)
-            print(data)
-            self.lock.acquire()
-            self.frames.append(data)
-            if len(self.frames) > self.n:
-                self.frames = self.frames[1:-1]
-            self.lock.release()
+            # print(data)
+            # self.lock.acquire()
+            # self.frames.append(data)
+            # if len(self.frames) > self.n:
+            #     self.frames = self.frames[1:-1]
+            # self.lock.release()
             if self.t1 == 5:
                 im = self.draw()
                 imp = ImageTk.PhotoImage(image=im)
@@ -263,10 +299,19 @@ class MCHandleTrainer:
 
             # 预测模式
             if self.t2 == 5 and self.train_mode is False:
+                self.t2 = 0
+                self.lock.acquire()
                 x = np.array(self.frames[len(self.frames) - self.select:])
+                self.lock.release()
                 x = x.reshape((1, x.size))
-                y = model.predict(x=x)
-                self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_INFO, 'predict', '%s' % y))
+                # print('X shape:', x.shape)
+                # res = model.train_on_batch(x=x, y=y)
+                predict = model.predict(x=x)[0]
+                predict = predict.tolist()
+                res = predict.index(max(predict))
+                res = self.ACTIONS[res]
+                # print('predict:', res)
+                self.logger_test.push(UiLogger.Item(UiLogger.LEVEL_INFO, 'predict %.2f' % (time.time() - start), '%s' % res))
 
     def draw(self):
         width = 1
@@ -283,10 +328,13 @@ class MCHandleTrainer:
             for j in range(12):
                 draw.line((width * i, self.frames[i][j] + size[1] / 2,
                            width * (i + 1), self.frames[i + 1][j] + size[1] / 2), fill=colors[j])
+        sx = size[0] - width * self.select
+        draw.line((sx, 0, sx, size[1]), fill='red')
         return im
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     _trainer = MCHandleTrainer()
     # _trainer.init_communication()
     _trainer.mainloop()

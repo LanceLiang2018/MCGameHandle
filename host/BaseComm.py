@@ -19,7 +19,10 @@ class BaseComm:
             return ''
         while c != '\n':
             s = s + c
-            c = self.serial.read(1).decode('gbk')
+            try:
+                c = self.serial.read(1).decode('gbk')
+            except UnicodeDecodeError:
+                c = ' '
         return s
 
     # 数据格式 [ax, ay, az, ag1, ag2, ag3, A1, A2, A3, A6] (10)

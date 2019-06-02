@@ -8,6 +8,8 @@ from host.BaseCtrl import BaseCtrl as ctrl
 from host.codemap import VirtualKeyCode
 from host.ui_logger import UiLogger
 import numpy as np
+from PIL import ImageTk, Image, ImageDraw
+import multiprocessing
 
 
 class MCHandle:
@@ -38,6 +40,7 @@ class MCHandle:
         self.n = 512
         self.select = 64
         self.frames = [[0 for i in range(12)] for j in range(self.n)]
+        self.raw = [[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] for j in range(self.n)]
 
         # 建立网络
         self.model_file = 'mc_actions.h5'
@@ -85,11 +88,16 @@ class MCHandle:
         self.root.title("MC手柄")
 
         self.logger = UiLogger(self.root, height=10, width=32)
-        self.logger.logger().grid(row=1, column=1, sticky=W+E)
+        self.logger.logger().grid(row=2, column=1, sticky=W+E)
+        self.panel = Label(self.root)
+        self.panel.grid(row=1, column=1, sticky=W+E)
 
         self.lock = threading.Lock()
 
-        t = threading.Thread(target=self.run_thread)
+        t = threading.Thread(target=self.read_thread)
+        t.setDaemon(True)
+        t.start()
+        t = threading.Thread(target=self.parse_thread)
         t.setDaemon(True)
         t.start()
 
@@ -152,23 +160,77 @@ class MCHandle:
     def init_communication_refresh(self):
         pass
 
-    # 第二个线程，负责读取->应用
-    def run_thread(self):
+    def draw(self):
+        width = 1
+        height = 32
+        colors = [
+            'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple',
+            'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple',
+        ]
+
+        size = (width * self.n, height * 6)
+        im = Image.new("RGB", size, color='white')
+        draw = ImageDraw.Draw(im)
+        for i in range(self.n - 2):
+            for j in range(12):
+                draw.line((width * i, self.frames[i][j] + size[1] / 2,
+                           width * (i + 1), self.frames[i + 1][j] + size[1] / 2), fill=colors[j])
+        sx = size[0] - width * self.select
+        draw.line((sx, 0, sx, size[1]), fill='red')
+        return im
+
+    # 第二个线程，负责读取
+    def read_thread(self):
+        while True:
+            time.sleep(0.01)
+            data_left = self.comm_left.read1epoch()
+            data_right = self.comm_right.read1epoch()
+            self.lock.acquire()
+            self.raw.append([data_left, data_right])
+            if len(self.raw) > self.n:
+                self.raw = self.raw[1:-1]
+            self.lock.release()
+            # frames添加数据
+            ann = data_left[0:6]
+            ann.extend(data_right[0:6])
+            self.lock.acquire()
+            self.frames.append(ann)
+            if len(self.frames) > self.n:
+                self.frames = self.frames[1:-1]
+            self.lock.release()
+            # print('ANN DATA:', ann)
+
+    # 第三个线程，负责解析数据
+    def parse_thread(self):
         # 读取神经网络模型
         model = load_model(self.model_file)
 
-        t2 = 0
+        t1, t2 = 0, 0
 
         click = False
         key1 = ctrl.ACTION_NONE
         key2 = ctrl.ACTION_NONE
         jump = ctrl.ACTION_NONE
 
+        start = time.time()
+
         while True:
+            if t1 == 5:
+                im = self.draw()
+                imp = ImageTk.PhotoImage(image=im)
+                self.panel.configure(image=imp)
+                self.panel.image = imp
+                t1 = 0
+            t1 += 1
+
             time.sleep(0.01)
 
-            data_left = self.comm_left.read1epoch()
-            data_right = self.comm_right.read1epoch()
+            # data_left = self.comm_left.read1epoch()
+            # data_right = self.comm_right.read1epoch()
+            self.lock.acquire()
+            data_left = self.raw[-1][0]
+            data_right = self.raw[-1][1]
+            self.lock.release()
 
             # 右手处理
             right_ctrl = data_right[-4:]
@@ -224,17 +286,10 @@ class MCHandle:
                 ctrl.kbd_up(VirtualKeyCode.S_key)
 
             # 处理神经网络判断
-            # frames添加数据
-            ann = data_left[0:6]
-            ann.extend(data_right[0:6])
-            self.lock.acquire()
-            self.frames.append(ann)
-            self.lock.release()
-            # print('ANN DATA:', ann)
             t2 += 1
 
             # 隔一段时间再判断
-            if t2 == 5:
+            if t2 == 15:
                 t2 = 0
                 self.lock.acquire()
                 x = np.array(self.frames[len(self.frames) - self.select:])
@@ -247,9 +302,10 @@ class MCHandle:
                 res = predict.index(max(predict))
                 res = self.ACTIONS[res]
                 # print('predict:', res)
-                self.logger.push(UiLogger.Item(UiLogger.LEVEL_INFO, 'predict', '%s' % res))
+                self.logger.push(UiLogger.Item(UiLogger.LEVEL_INFO, 'predict %.2f' % (time.time() - start), '%s' % res))
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     _handle = MCHandle()
     _handle.mainloop()
