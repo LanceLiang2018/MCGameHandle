@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageTk
 import numpy as np
 import time
 import multiprocessing
+import queue
 
 from host.BaseComm import BaseComm
 from host.ui_logger import UiLogger
@@ -27,21 +28,22 @@ class MCHandleTrainer:
     def __init__(self, root=None):
         self.init_top = Tk()
 
+        self.port_left = 'COM4'
+        self.port_right = 'COM5'
+
         self.init_bps = StringVar()
         self.init_bps.set('115200')
         self.init_com_left = StringVar()
-        self.init_com_left.set('COM8')
+        self.init_com_left.set(self.port_left)
         self.init_com_right = StringVar()
-        self.init_com_right.set('COM9')
+        self.init_com_right.set(self.port_right)
 
         self.init_communication()
 
-        self.port_left = 'COM8'
-        self.port_right = 'COM9'
         self.bps = 115200
         self.comm = None
         self.n = 512
-        self.select = 64
+        self.select = 24
         self.frames = [[0 for i in range(12)] for j in range(self.n)]
         self.raw = [[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] for j in range(self.n)]
 
@@ -205,12 +207,31 @@ class MCHandleTrainer:
     def init_communication_refresh(self):
         pass
 
+    # 单个手柄数据读取
+    def read_data(self, comm: BaseComm, q: queue.Queue):
+        q.put(comm.read1epoch())
+
     # 第二个线程，负责读取
     def read_thread(self):
         while True:
             time.sleep(0.01)
-            data_left = self.comm_left.read1epoch()
-            data_right = self.comm_right.read1epoch()
+            q_left = queue.Queue()
+            q_right = queue.Queue()
+            # data_left = self.comm_left.read1epoch()
+            # data_right = self.comm_right.read1epoch()
+            thread_left = threading.Thread(target=self.read_data, args=(self.comm_left, q_left))
+            thread_right = threading.Thread(target=self.read_data, args=(self.comm_right, q_right))
+            thread_left.setDaemon(True)
+            thread_right.setDaemon(True)
+            thread_left.start()
+            thread_right.start()
+            thread_left.join(5)
+            thread_right.join(5)
+            if q_left.empty() or q_right.empty():
+                print('WARING: 数据读取失败!')
+                continue
+            data_left = q_left.get()
+            data_right = q_right.get()
             self.lock.acquire()
             self.raw.append([data_left, data_right])
             if len(self.raw) > self.n:
@@ -234,9 +255,8 @@ class MCHandleTrainer:
             print("Can't find", self.model_file)
             model = Sequential()
             model.add(Dense(self.select * 12, activation='tanh', input_dim=self.select * 12))
-            # model.add(Dense(384, activation='tanh', input_dim=384))
-            # model.add(Dense(128, activation='tanh'))
-            model.add(Dense(self.select * 3, activation='tanh'))
+            model.add(Dense(self.select * 24, activation='tanh'))
+            model.add(Dense(self.select * 8, activation='tanh'))
             model.add(Dense(self.select, activation='tanh'))
             model.add(Dense(6, activation='softmax'))
 

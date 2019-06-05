@@ -24,21 +24,22 @@ class MCHandle:
     def __init__(self, root=None):
         self.init_top = Tk()
 
+        self.port_left = 'COM4'
+        self.port_right = 'COM5'
+
         self.init_bps = StringVar()
         self.init_bps.set('115200')
         self.init_com_left = StringVar()
-        self.init_com_left.set('COM8')
+        self.init_com_left.set(self.port_left)
         self.init_com_right = StringVar()
-        self.init_com_right.set('COM9')
+        self.init_com_right.set(self.port_right)
 
         self.init_communication()
 
-        self.port_left = 'COM8'
-        self.port_right = 'COM9'
         self.bps = 115200
         self.comm = None
         self.n = 512
-        self.select = 64
+        self.select = 24
         self.frames = [[0 for i in range(12)] for j in range(self.n)]
         self.raw = [[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] for j in range(self.n)]
 
