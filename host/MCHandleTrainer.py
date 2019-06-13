@@ -256,7 +256,11 @@ class MCHandleTrainer:
             model = Sequential()
             model.add(Dense(self.select * 12, activation='tanh', input_dim=self.select * 12))
             model.add(Dense(self.select * 24, activation='tanh'))
-            model.add(Dense(self.select * 8, activation='tanh'))
+            model.add(Dense(self.select * 32, activation='tanh'))
+            model.add(Dense(self.select * 48, activation='tanh'))
+            model.add(Dense(self.select * 32, activation='tanh'))
+            model.add(Dense(self.select * 24, activation='tanh'))
+            model.add(Dense(self.select * 12, activation='tanh'))
             model.add(Dense(self.select, activation='tanh'))
             model.add(Dense(6, activation='softmax'))
 
